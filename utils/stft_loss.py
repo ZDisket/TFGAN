@@ -9,6 +9,10 @@ import torch
 import torch.nn.functional as F
 
 
+from distutils.version import LooseVersion
+
+is_pytorch_17plus = LooseVersion(torch.__version__) >= LooseVersion("1.7")
+
 def stft(x, fft_size, hop_size, win_length, window):
     """Perform STFT and convert to magnitude spectrogram.
     Args:
@@ -20,7 +24,13 @@ def stft(x, fft_size, hop_size, win_length, window):
     Returns:
         Tensor: Magnitude spectrogram (B, #frames, fft_size // 2 + 1).
     """
-    x_stft = torch.stft(x, fft_size, hop_size, win_length, window)
+    if is_pytorch_17plus:
+        x_stft = torch.stft(
+            x, fft_size, hop_size, win_length, window, return_complex=False
+        )
+    else:
+        x_stft = torch.stft(x, fft_size, hop_size, win_length, window)
+
     real = x_stft[..., 0]
     imag = x_stft[..., 1]
 
@@ -74,6 +84,7 @@ class STFTLoss(torch.nn.Module):
         self.shift_size = shift_size
         self.win_length = win_length
         self.window = getattr(torch, window)(win_length)
+        self.window = self.window.to(device="cuda")
         self.spectral_convergenge_loss = SpectralConvergengeLoss()
         self.log_stft_magnitude_loss = LogSTFTMagnitudeLoss()
 
